@@ -1,60 +1,150 @@
 import 'package:flutter/material.dart';
+import 'package:math_expressions/math_expressions.dart';
 
 void main() {
-  runApp(CalculatorApp());
+  runApp(const CalculatorApp());
 }
 
 class CalculatorApp extends StatelessWidget {
+  const CalculatorApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
-      home: CalculatorScreen(),
+      home: const CalculatorScreen(),
     );
   }
 }
 
 class CalculatorScreen extends StatefulWidget {
+  const CalculatorScreen({super.key});
+
   @override
   _CalculatorScreenState createState() => _CalculatorScreenState();
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  String _output = "0";
-  String _expression = "";
+  String _expression = '';
+  String _output = '0';
+  bool _isResultDisplayed = false;
 
-  void _buttonPressed(String value) {
+  void _buttonPressed(String label) {
     setState(() {
-      if (value == "=") {
-        try {
-          _output = _evaluateExpression(_expression);
-          _expression = _output;
-        } catch (e) {
-          _output = "Error";
-        }
-      } else if (value == "C") {
-        _expression = "";
-        _output = "0";
-      } else if (value == "←") {
-        _expression = _expression.isNotEmpty
-            ? _expression.substring(0, _expression.length - 1)
-            : "";
-        _output = _expression.isNotEmpty ? _expression : "0";
+      if (label == 'C') {
+        _clear();
+      } else if (label == '±') {
+        _toggleSign();
+      } else if (label == '%') {
+        _percent();
+      } else if (label == '=') {
+        _calculate();
+      } else if (label == '←') {
+        _backspace();
       } else {
-        _expression += value;
-        _output = _expression;
+        _updateExpression(label);
       }
     });
   }
 
-  String _evaluateExpression(String expression) {
+  void _clear() {
+    _expression = '';
+    _output = '0';
+    _isResultDisplayed = false;
+  }
+
+  void _toggleSign() {
+    if (_output != '0') {
+      if (_output.startsWith('-')) {
+        _output = _output.substring(1);
+      } else {
+        _output = '-' + _output;
+      }
+      _expression = _output;
+    }
+  }
+
+  void _percent() {
+    if (_output != '0') {
+      double result = (double.tryParse(_output) ?? 0) / 100.0;
+      _output = result.toString();
+      _expression = _output;
+    }
+  }
+
+  void _calculate() {
     try {
-      final result = expression.replaceAll("×", "*").replaceAll("÷", "/");
-      final double eval = double.parse(result); // Replace with a proper parser.
-      return eval.toStringAsFixed(2).replaceAll(RegExp(r'\.0+$'), '');
+      Parser parser = Parser();
+      Expression expression =
+          parser.parse(_expression.replaceAll('×', '*').replaceAll('÷', '/'));
+      double result = expression.evaluate(EvaluationType.REAL, ContextModel());
+
+      _output = _formatResult(result);
+      _expression = _output;
+      _isResultDisplayed = true;
     } catch (e) {
-      return "Error";
+      _output = 'Error';
+    }
+  }
+
+  void _backspace() {
+    if (_isResultDisplayed) {
+      setState(() {
+        _expression = _output;
+        _isResultDisplayed = false;
+      });
+    }
+
+    if (_expression.isNotEmpty) {
+      _expression = _expression.substring(0, _expression.length - 1);
+      if (_expression.isEmpty) {
+        _output = '0';
+      } else {
+        _output = _expression;
+      }
+    }
+  }
+
+  void _updateExpression(String label) {
+    if (_isResultDisplayed && RegExp(r'[0-9]').hasMatch(label)) {
+      _clear();
+    }
+    if (_isResultDisplayed && RegExp(r'[+\-×÷]').hasMatch(label)) {
+      _isResultDisplayed = false;
+    }
+
+    if (_expression.isNotEmpty &&
+        RegExp(r'[+\-×÷]').hasMatch(_expression[_expression.length - 1]) &&
+        RegExp(r'[+\-×÷]').hasMatch(label)) {
+      _expression = _expression.substring(0, _expression.length - 1) + label;
+    } else if (label == '%') {
+      RegExp regex = RegExp(r'(\d+\.?\d*)$');
+      Match? match = regex.firstMatch(_expression);
+
+      if (match != null) {
+        String numberStr = match.group(0)!;
+        double number = double.parse(numberStr);
+
+        double percentValue = number / 100;
+        _expression =
+            _expression.replaceAll(numberStr, percentValue.toString());
+      }
+    } else {
+      if (_expression == '0' && RegExp(r'[0-9]').hasMatch(label)) {
+        _expression = label;
+      } else {
+        _expression += label;
+      }
+    }
+    _output = _expression;
+  }
+
+  String _formatResult(double result) {
+    if (result == result.toInt()) {
+      return result.toInt().toString();
+    } else {
+      return result.toStringAsFixed(2);
     }
   }
 
@@ -68,7 +158,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           color: backgroundColor ?? Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
-        margin: EdgeInsets.all(4),
+        margin: const EdgeInsets.all(4),
         child: Text(
           label,
           style: TextStyle(
@@ -117,7 +207,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             flex: 2,
             child: Container(
               alignment: Alignment.bottomRight,
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -128,7 +218,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                   Text(
                     _output,
-                    style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300),
+                    style: const TextStyle(
+                        fontSize: 48, fontWeight: FontWeight.w300),
                   ),
                 ],
               ),
